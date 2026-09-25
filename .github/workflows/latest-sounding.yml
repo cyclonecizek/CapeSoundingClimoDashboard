@@ -1,0 +1,64 @@
+# Pulls the newest XMR (74794) sounding every hour and redeploys the dashboard
+# when one arrives. Also redeploys whenever you push changes to main.
+# Requires: Settings -> Pages -> Build and deployment -> Source = "GitHub Actions".
+name: Latest XMR sounding
+
+on:
+  schedule:
+    - cron: "17 * * * *"      # hourly, a few minutes past the hour
+  workflow_dispatch:           # "Run workflow" button in the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: latest-sounding
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "siphon>=0.11.0" numpy pandas
+      - run: python update_latest.py
+      - id: commit
+        name: Commit latest.json if a new sounding arrived
+        run: |
+          if [ -z "$(git status --porcelain latest.json)" ]; then
+            echo "No new sounding."; echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          git commit -m "Latest XMR sounding $(python -c 'import json;print(json.load(open("latest.json"))["valid"])')"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: update
+    if: always() && (github.event_name == 'push' || needs.update.outputs.changed == 'true')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
