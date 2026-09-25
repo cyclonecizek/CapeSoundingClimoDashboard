@@ -498,7 +498,15 @@ def pw_mm(pr, pbot, ptop):
 
 
 def features(hdr, raw):
-    lt2, p, z, t, td, wd, ws = parse_levels(raw)
+    """Features from raw IGRA2 level records."""
+    return features_from_arrays(hdr, *parse_levels(raw), n_levels=len(raw))
+
+
+def features_from_arrays(hdr, lt2, p, z, t, td, wd, ws, n_levels=None):
+    """Features from level arrays: pressure hPa, height m MSL, T/Td C,
+    wind direction deg, wind speed m/s; lt2 == 1 marks the surface level.
+    hdr needs year, month, day, hour, reltime (9999 if unknown)."""
+    raw = range(n_levels if n_levels is not None else len(p))
     pr = Profile(lt2, p, z, t, td, wd, ws)
     if pr.p_top > 400.0:
         raise ValueError(f"sounding terminated at {pr.p_top:.0f} hPa")

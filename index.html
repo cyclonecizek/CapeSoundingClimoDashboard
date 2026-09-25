@@ -51,6 +51,7 @@ body{
 header{padding-bottom:18px;border-bottom:2px solid var(--ink)}
 .station{margin:0 0 6px;color:var(--muted);font-size:15px}
 .station strong{color:var(--ink);font-weight:600}
+.alt{margin-left:14px;color:var(--accent);font-weight:500;white-space:nowrap}
 h1{margin:0;font-weight:600;font-size:clamp(30px,4.6vw,54px);line-height:1.05;letter-spacing:-.01em}
 .pwrap{position:relative;display:inline-block;max-width:100%}
 #paramBtn{
@@ -130,6 +131,21 @@ table.pct td.bar{width:auto}
 .check input[type=number]{width:7.5em}
 .answer{margin:12px 0 0;font-size:16px;max-width:60ch}
 .answer b{font-family:"Barlow Condensed",system-ui,sans-serif;font-size:24px;color:var(--mark);font-weight:700}
+.lctrl{display:flex;flex-wrap:wrap;gap:8px 24px;margin:2px 0 6px}
+.score{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:0 32px;margin-top:6px}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) auto 84px 3.1em;align-items:center;gap:10px;width:100%;background:none;border:0;
+  border-bottom:1px solid var(--grid);padding:7px 4px;font:inherit;color:var(--ink);text-align:left;cursor:pointer;min-height:36px}
+.srow:hover{background:var(--grid)}
+.srow.cur{box-shadow:inset 3px 0 var(--accent)}
+.sn{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv{font-weight:600;font-size:15px;text-align:right;white-space:nowrap}
+.sb{position:relative;height:10px;border-radius:2px;background:linear-gradient(90deg,var(--band-outer) 0 10%,var(--grid) 10% 90%,var(--band-outer) 90% 100%)}
+.sb i{position:absolute;top:-3px;width:16px;height:16px;border-radius:50%;background:var(--accent);transform:translateX(-8px);border:2px solid var(--paper)}
+.sb i.ext{background:var(--mark)}
+.sp{font-size:14px;color:var(--muted);text-align:right}
+.sg{grid-column:1/-1;margin:16px 0 2px}
+.stats .lat b::before{content:"";display:inline-block;width:.42em;height:.42em;background:var(--ink);transform:rotate(45deg);margin:0 .38em .12em 0}
+#latestSec[hidden]{display:none}
 #tip{position:fixed;pointer-events:none;z-index:20;background:var(--ink);color:var(--paper);padding:7px 10px;border-radius:3px;font-size:13px;line-height:1.35;opacity:0;transition:opacity .08s;max-width:260px}
 #tip b{font-weight:600}
 footer{padding-top:20px;color:var(--muted);font-size:14px;max-width:90ch}
@@ -140,7 +156,7 @@ footer p{margin:0 0 8px}
 <body>
 <div class="wrap">
 <header>
-  <p class="station"><strong>Cape Canaveral (XMR, WMO 74794)</strong> radiosonde climatology, May–September, <span id="yrs">1996–2025</span></p>
+  <p class="station"><strong>Cape Canaveral (XMR, WMO 74794)</strong> radiosonde climatology, May–September, <span id="yrs">1996–2025</span><a class="alt" id="altLink" href="annual.html" hidden>Year-round version</a></p>
   <h1 class="cond"><span class="pwrap"><button type="button" id="paramBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="picker"><span id="paramName"></span><span class="chev" aria-hidden="true"></span></button>
     <div class="picker" id="picker" hidden>
       <input type="search" id="psearch" placeholder="Search parameters" aria-label="Search parameters" autocomplete="off" aria-controls="plist">
@@ -159,6 +175,16 @@ footer p{margin:0 0 8px}
     <select class="small" id="y0" aria-label="First year"></select><span class="flabel">to</span>
     <select class="small" id="y1" aria-label="Last year"></select></div>
 </div>
+
+<section id="latestSec">
+  <h2 id="latestTitle">Latest sounding</h2>
+  <p class="sub" id="latestMeta"></p>
+  <div class="lctrl">
+    <label class="toggle"><input type="checkbox" id="matchHour" checked> Compare with the same launch time only</label>
+    <label class="toggle"><input type="checkbox" id="showAll"> Show all parameters</label>
+  </div>
+  <div class="score" id="scorecard"></div>
+</section>
 
 <section>
   <h2>Through the season</h2>
@@ -186,6 +212,7 @@ footer p{margin:0 0 8px}
         <select class="small" id="cmon" aria-label="Month"></select>
         <select class="small" id="cday" aria-label="Day"></select>
       </div>
+      <div class="row"><button type="button" class="chip" id="useLatest">Use the latest sounding</button></div>
       <p class="answer" id="answer">Enter a value to see where it ranks against soundings from the same time of year.</p>
     </div>
   </div>
@@ -224,6 +251,7 @@ footer p{margin:0 0 8px}
 <footer>
   <p>Source: NOAA NCEI IGRA 2.2, station USM00074794, nominal launch times as archived. <span id="nsound"></span> soundings passed quality checks. Soundings that ended below 400 hPa, or had an implausible surface pressure, were excluded.</p>
   <p>Parcel method: the Lifted Index, Thompson Index, MLCAPE/MLCIN, LCL/LFC/EL heights and the CAPE-based composites use a 100 hPa mean-layer parcel with virtual-temperature correction. SBCAPE and MUCAPE are shown for reference; a small number of soundings carry implausibly high surface dewpoints that inflate those two.</p>
+  <p>Latest sounding: read from latest.json, which the included GitHub Actions workflow refreshes hourly from the University of Wyoming archive, with NOAA IGRA2 as a backup.</p>
   <p>Winds are in knots; heights are above ground level unless noted. Values are quantized to 1/65,535 of each parameter's range for this page.</p>
 </footer>
 </div>
@@ -271,14 +299,14 @@ const q=(s,p)=>{ if(!s.length)return NaN; const h=(s.length-1)*p, lo=Math.floor(
 function sorted(arr){const f=Float64Array.from(arr);f.sort();return f;}
 function dosLabel(d){let m=0;while(d>=MSTART[m+1])m++;return `${d-MSTART[m]+1} ${MSHORT[m]}`;}
 
-function idx(ign){
+function idx(...ign){
   const out=[], allR=S.regimes.size===4;
   for(let i=0;i<N;i++){
     const y=Y0+YR[i];
-    if(ign!=="year"&&(y<S.y0||y>S.y1))continue;
-    if(ign!=="hour"&&!S.hours.has(HGI[i]))continue;
-    if(ign!=="regime"&&!(RG[i]===255?allR:S.regimes.has(RG[i])))continue;
-    if(ign!=="month"&&!S.months.has(MI[i]))continue;
+    if(!ign.includes("year")&&(y<S.y0||y>S.y1))continue;
+    if(!ign.includes("hour")&&!S.hours.has(HGI[i]))continue;
+    if(!ign.includes("regime")&&!(RG[i]===255?allR:S.regimes.has(RG[i])))continue;
+    if(!ign.includes("month")&&!S.months.has(MI[i]))continue;
     out.push(i);
   }
   return out;
@@ -329,7 +357,8 @@ function setActive(k,scroll){
 function openPick(){pick.hidden=false;btn.setAttribute("aria-expanded","true");srch.value="";buildList();
   const sel=$("#opt-"+S.param); if(sel)sel.scrollIntoView({block:"center"}); srch.focus({preventScroll:true});}
 function closePick(focusBtn){if(pick.hidden)return;pick.hidden=true;btn.setAttribute("aria-expanded","false");if(focusBtn)btn.focus();}
-function choose(k){closePick(true);if(k===S.param)return;S.param=k;S.cval=null;$("#cval").value="";paramName();render();}
+function setParam(k){if(k===S.param)return;S.param=k;S.cval=null;$("#cval").value="";paramName();render();}
+function choose(k){closePick(true);setParam(k);}
 btn.addEventListener("click",()=>pick.hidden?openPick():closePick(false));
 srch.addEventListener("input",buildList);
 srch.addEventListener("keydown",e=>{
@@ -385,6 +414,8 @@ function header(ix){
   $("#stats").innerHTML= s.length? `<div><b>${d3.format(",")(s.length)}</b><span>soundings</span></div>
     <div><b>${fmt(S.param,q(s,.5),false)}</b><span>median${p.u?" ("+p.u+")":""}</span></div>
     <div><b>${fmt(S.param,q(s,.1),false)} to ${fmt(S.param,q(s,.9),false)}</b><span>10th to 90th percentile</span></div>`
+    + (()=>{const r=rankOf(S.param);if(!r)return "";const L=linfo();
+       return `<div class="lat"><b>${fmt(S.param,r.v,false)}</b><span>latest (${String(L.h).padStart(2,"0")}Z ${L.day})${r.p!=null?", "+ord(Math.round(r.p))+" percentile for the date":""}</span></div>`;})()
     : `<div><span>No soundings match these filters.</span></div>`;
 }
 
@@ -403,6 +434,7 @@ function season(){
   const x=d3.scaleLinear([0,152],[0,iw]);
   let lo=d3.min(rows,r=>r.p10),hi=d3.max(rows,r=>r.p90);
   if(S.cval!=null){lo=Math.min(lo,S.cval);hi=Math.max(hi,S.cval);}
+  {const r=rankOf(S.param);if(r&&isFinite(r.v)){lo=Math.min(lo,r.v);hi=Math.max(hi,r.v);}}
   const pad=(hi-lo)*.08||1, y=d3.scaleLinear([lo-pad,hi+pad],[ih,0]).nice();
   g.append("g").attr("class","gridl").call(d3.axisLeft(y).ticks(6).tickSize(-iw).tickFormat(""));
   g.append("g").attr("class","axis").call(d3.axisLeft(y).ticks(6));
@@ -420,6 +452,11 @@ function season(){
   if(S.cval!=null){
     g.append("circle").attr("cx",x(S.cdos)).attr("cy",y(S.cval)).attr("r",6.5).attr("fill",css("--mark")).attr("stroke",css("--paper")).attr("stroke-width",2);
   }
+  { const r=rankOf(S.param), L=linfo();
+    if(r&&isFinite(r.v)){const cy=Math.max(0,Math.min(ih,y(r.v))), cx=x(L.dos);
+      g.append("path").attr("transform",`translate(${cx},${cy})`).attr("d",d3.symbol(d3.symbolDiamond,110)()).attr("fill",css("--ink")).attr("stroke",css("--paper")).attr("stroke-width",2);
+      g.append("text").attr("x",cx>iw-60?cx-10:cx+10).attr("text-anchor",cx>iw-60?"end":"start").attr("y",cy-10).attr("fill",css("--ink")).attr("font-size",13).attr("font-weight",600)
+        .attr("stroke",css("--paper")).attr("stroke-width",3).attr("paint-order","stroke").text("Latest");}}
   const hl=g.append("line").attr("y1",0).attr("y2",ih).attr("stroke",css("--ink")).attr("stroke-width",1).attr("opacity",0);
   g.append("rect").attr("width",iw).attr("height",ih).attr("fill","transparent")
     .on("pointermove",ev=>{const d=Math.round(x.invert(d3.pointer(ev)[0]));const r=rows.reduce((b,c)=>Math.abs(c.d-d)<Math.abs(b.d-d)?c:b);
@@ -454,6 +491,10 @@ function hist(ix){
       acc+=v;}});
   const med=q(s,.5);
   g.append("line").attr("x1",x(med)).attr("x2",x(med)).attr("y1",0).attr("y2",ih).attr("stroke",css("--line")).attr("stroke-width",2).attr("stroke-dasharray","5,3");
+  {const r=rankOf(S.param);if(r&&isFinite(r.v)){const xv=x(Math.max(lo,Math.min(hi,r.v)));
+    g.append("line").attr("x1",xv).attr("x2",xv).attr("y1",0).attr("y2",ih).attr("stroke",css("--ink")).attr("stroke-width",2);
+    g.append("text").attr("x",xv+(xv>iw-50?-5:5)).attr("text-anchor",xv>iw-50?"end":"start").attr("y",10).attr("fill",css("--ink")).attr("font-size",12).attr("font-weight",600)
+      .attr("stroke",css("--panel")).attr("stroke-width",3).attr("paint-order","stroke").text("Latest");}}
   if(S.cval!=null&&S.cval>=lo&&S.cval<=hi) g.append("line").attr("x1",x(S.cval)).attr("x2",x(S.cval)).attr("y1",0).attr("y2",ih).attr("stroke",css("--mark")).attr("stroke-width",3);
 }
 
@@ -472,10 +513,11 @@ function answer(){
   const a=col(S.param), ix=idx("month"), w=[];
   for(const i of ix){if(Math.abs(DOS[i]-S.cdos)<=7){const v=a[i];if(v===v)w.push(v);}}
   if(w.length<20){el.textContent="Too few soundings near that date with these filters. Widen the launch-time, flow or year selection.";return;}
-  let below=0,eq=0;for(const v of w){if(v<S.cval)below++;else if(v===S.cval)eq++;}
+  const tol=pm(S.param).s*0.51+1e-9;
+  let below=0,eq=0;for(const v of w){if(Math.abs(v-S.cval)<=tol)eq++;else if(v<S.cval)below++;}
   const pr=Math.round((below+eq/2)/w.length*100);
   const hrs=S.hours.size===5?"all":[...S.hours].sort().map(k=>HLAB[k]).join(", ");
-  el.innerHTML=`<b>${pr}th percentile.</b> ${fmt(S.param,S.cval)} is higher than ${pr}% of ${hrs==="all"?"":hrs+" "}soundings within a week of ${dosLabel(S.cdos)} (n=${w.length}).`;
+  el.innerHTML=`<b>${ord(pr)} percentile.</b> ${fmt(S.param,S.cval)} is higher than ${pr}% of ${hrs==="all"?"":hrs+" "}soundings within a week of ${dosLabel(S.cdos)} (n=${w.length}).`;
 }
 
 /* ---------------- box plots ---------------- */
@@ -605,13 +647,74 @@ function rose(ix){
       acc+=p;});});
 }
 
+/* ---------------- latest sounding ---------------- */
+let LATEST={"station":"XMR 74794","valid":"2026-09-22T10:00Z","source":"NOAA NCEI IGRA2","generated":"2026-09-25T12:22Z","values":{"date":"2026-09-22","year":2026,"month":9,"day":22,"doy":265,"nominal_hour_utc":10,"release_time_utc":null,"n_levels":103,"p_top_thermo":7.9,"p_top_moist":200.0,"p_top_wind":10.0,"sfc_p":1012.0,"sfc_t":23.4,"sfc_td":23.2,"sfc_rh":98.7984,"sfc_w":17.9768,"sfc_thetae":347.3632,"sfc_tw":23.257,"sfc_u":0.0,"sfc_v":-0.0,"sfc_wdir":0.0,"sfc_wspd":0.0,"t1000":25.2,"td1000":23.3,"dpd1000":1.9,"rh1000":89.2227,"w1000":18.3124,"thetae1000":351.8133,"z1000":108.2527,"u1000":2.2336,"v1000":1.8742,"wdir1000":230.0,"wspd1000":2.9158,"t925":21.2028,"td925":18.7869,"dpd925":2.4159,"rh925":86.0948,"w925":14.9206,"thetae925":345.024,"z925":791.0078,"u925":1.0977,"v925":3.9541,"wdir925":195.516,"wspd925":4.1036,"t850":17.4,"td850":14.1,"dpd850":3.3,"rh850":80.9559,"w850":11.9918,"thetae850":340.3459,"z850":1520.6646,"u850":1.0565,"v850":3.943,"wdir850":195.0,"wspd850":4.0821,"t700":9.0,"td700":4.0,"dpd700":5.0,"rh700":70.8755,"w700":7.3108,"thetae700":335.3683,"z700":3158.7745,"u700":-0.3558,"v700":4.0665,"wdir700":175.0,"wspd700":4.0821,"t500":-5.3,"td500":-16.3,"dpd500":11.0,"rh500":41.7055,"w500":2.1475,"thetae500":333.9764,"z500":5868.6683,"u500":5.9148,"v500":12.6844,"wdir500":205.0,"wspd500":13.9957,"t400":-15.9,"td400":-25.9,"dpd400":10.0,"rh400":41.9468,"w400":1.1623,"thetae400":338.471,"z400":7587.8039,"u400":14.9106,"v400":1.3045,"wdir400":265.0,"wspd400":14.9676,"t300":-31.9,"td300":-42.9,"dpd300":11.0,"rh300":32.791,"w300":0.2897,"thetae300":341.3619,"z300":9688.3464,"u300":22.1558,"v300":5.9366,"wdir300":255.0,"wspd300":22.9374,"t250":-42.1,"td250":-54.1,"dpd250":12.0,"rh250":25.8319,"w250":0.0977,"thetae250":343.6245,"z250":10949.153,"u250":17.3392,"v250":10.0108,"wdir250":240.0,"wspd250":20.0216,"t200":-54.9,"td200":-62.9,"dpd200":8.0,"rh200":36.4012,"w200":0.0404,"thetae200":345.6896,"z200":12416.1467,"u200":25.3688,"v200":11.8297,"wdir200":245.0,"wspd200":27.9914,"thickness_1000_500":5760.4156,"pw_sfc_850_in":0.9653,"pw_sfc_700_in":1.5166,"pw_sfc_500_in":1.922,"pw_sfc_400_in":1.9847,"pw_sfc_300_in":2.0062,"pw_1000_850_in":0.8784,"pw_850_700_in":0.5514,"pw_700_500_in":0.4054,"pw_500_300_in":0.0842,"pwat_in":2.0062,"pwat_mm":50.9586,"rh_1000_700":78.3468,"rh_1000_850":84.5994,"rh_850_700":72.0941,"rh_850_500":70.0878,"rh_800_600":71.2433,"rh_700_500":68.583,"rh_500_300":34.2965,"w_ml":16.2379,"w_0_1km":16.0258,"humidity_index":19.3,"thetae_min_700_400":331.5395,"p_thetae_min_700_400":520.0,"thetae_deficit":15.8237,"thetae_850_minus_500":6.3694,"mdpi":0.6856,"z_frz":4607.2479,"p_frz":585.9955,"z_m10":6718.052,"p_m10":448.1368,"z_m20":8147.7375,"p_m20":370.9946,"z_m30":9460.6844,"p_m30":309.6573,"z_wbz":4398.4243,"hgz_depth":1429.6855,"lr_850_500":5.2208,"lr_700_500":5.277,"lr_sfc_850":3.9534,"lr_0_1km":3.2983,"lr_0_3km":4.5083,"lr_3_6km":5.3279,"k_index":31.8,"total_totals":42.1,"vertical_totals":22.7,"cross_totals":19.4,"sbcape":851.6444,"sbcin":-49.8271,"sb_lcl_p":1009.0295,"sb_lcl_z":25.8719,"sb_lcl_t":23.1513,"sb_lfc_p":864.7561,"sb_lfc_z":1370.0156,"sb_el_p":188.2472,"sb_el_z":12797.6264,"sb_el_t":-57.6062,"sbcape_0_3km":33.2002,"sbcape_m10_m30":242.0964,"sb_ncape":0.0745,"mlcape":769.0038,"mlcin":-16.0876,"ml_lcl_p":928.4003,"ml_lcl_z":756.1017,"ml_lcl_t":20.1687,"ml_lfc_p":856.1347,"ml_lfc_z":1456.0256,"ml_el_p":191.2794,"ml_el_z":12696.6364,"ml_el_t":-56.8921,"mlcape_0_3km":27.5618,"mlcape_m10_m30":220.3926,"ml_ncape":0.0684,"mucape":1877.0532,"mucin":-5.9806,"mu_lcl_p":979.8332,"mu_lcl_z":284.7211,"mu_lcl_t":23.1627,"mu_lfc_p":951.164,"mu_lfc_z":544.9342,"mu_el_p":163.2005,"mu_el_z":13685.5439,"mu_el_t":-63.321,"mucape_0_3km":126.5364,"mucape_m10_m30":482.3717,"mu_ncape":0.1428,"mu_p_origin":1006.0,"ml_parcel_theta":299.6048,"ml_parcel_t":27.4766,"lifted_index":-1.5384,"thompson_index":33.3384,"li_sfc":-1.6911,"thompson_index_sfc":33.4911,"showalter":1.3151,"warm_cloud_depth":3851.1462,"ccl_p":890.7784,"ccl_z":1114.6366,"conv_temp":30.3597,"conv_temp_deficit":6.9597,"dcape":521.016,"dcape_origin_p":656.0,"downdraft_t_sfc":19.9393,"downdraft_dt":3.4607,"windex":10.8014,"wmsi":12.1685,"u_1000_700":1.0015,"v_1000_700":6.1143,"wdir_1000_700":189.3027,"wspd_1000_700":6.1958,"u_1000_850":1.4211,"v_1000_850":4.3548,"wdir_1000_850":198.0728,"wspd_1000_850":4.5808,"u_850_700":0.582,"v_850_700":7.8737,"wdir_850_700":184.2274,"wspd_850_700":7.8952,"u_850_500":3.7493,"v_850_500":8.3922,"wdir_850_500":204.073,"wspd_850_500":9.1917,"u_850_300":7.8588,"v_850_300":6.2768,"wdir_850_300":231.3858,"wspd_850_300":10.0578,"u_700_500":6.1248,"v_700_500":8.7811,"wdir_700_500":214.8954,"wspd_700_500":10.7061,"u_500_300":15.0505,"v_500_300":2.5748,"wdir_500_300":260.292,"wspd_500_300":15.2692,"wspd_scalar_1000_700":6.3075,"flow_regime_1000_700":"SW","u_0_1km":1.8656,"v_0_1km":3.817,"wdir_0_1km":206.0469,"wspd_0_1km":4.2485,"u_0_3km":0.9921,"v_0_3km":6.0826,"wdir_0_3km":189.2641,"wspd_0_3km":6.163,"u_0_6km":3.5804,"v_0_6km":7.4584,"wdir_0_6km":205.6435,"wspd_0_6km":8.2733,"shear_0_1km":4.3154,"shear_0_3km":6.0627,"shear_0_6km":13.0114,"shear_0_8km":16.0251,"shear_850_500":10.0008,"shear_850_200":25.5595,"shear_sfc_500":13.9957,"bunkers_rm_u":14.713,"bunkers_rm_v":-1.9548,"bunkers_lm_u":-7.5521,"bunkers_lm_v":16.8716,"srh_0_1km":13.3088,"srh_0_3km":15.117,"ehi_0_1km":0.064,"ehi_0_3km":0.0727,"brn":328.8408,"sig_svr":5147.4516,"scp_fixed":0.0,"stp_fixed":0.0,"ship":0.1123,"sweat":191.3598}}, LIVE=false, LW=null;
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const ord=n=>{const t=n%100;return n+((t>10&&t<14)?"th":({1:"st",2:"nd",3:"rd"}[n%10]||"th"));};
+function linfo(){
+  if(!LATEST)return null;
+  const t=new Date(LATEST.valid), m=t.getUTCMonth()+1, d=t.getUTCDate(), h=t.getUTCHours();
+  let dos=0,clamped=false; if(m<5){clamped=true;dos=0;}else if(m>9){clamped=true;dos=152;}else dos=MSTART[m-5]+d-1;
+  return {t,m,d,h,dos,clamped,hg:h===0?0:h===10?1:h===12?2:h===15?3:4,
+    label:`${String(h).padStart(2,"0")}Z ${d} ${MON[m-1]} ${t.getUTCFullYear()}`,day:`${d} ${MON[m-1]}`};
+}
+function latestWindow(){
+  const L=linfo(), match=$("#matchHour").checked, W=[];
+  for(const i of idx("month",match?"hour":"")) if(Math.abs(DOS[i]-L.dos)<=7&&(!match||HGI[i]===L.hg)) W.push(i);
+  return W;
+}
+function rankOf(k){
+  const v=LATEST&&LATEST.values[k]; if(v==null||!LW)return null;
+  const a=col(k), tol=pm(k).s*0.51+1e-9; let n=0,b=0,e=0;   // ties within one storage step
+  for(const i of LW){const x=a[i];if(x!==x)continue;n++;if(Math.abs(x-v)<=tol)e++;else if(x<v)b++;}
+  return {v,n,p:n>=20?(b+e/2)/n*100:null};
+}
+function ago(t){const h=(Date.now()-t.getTime())/36e5;
+  return h<1?"less than an hour ago":h<36?`${Math.round(h)} hour${Math.round(h)===1?"":"s"} ago`:`${Math.round(h/24)} days ago`;}
+function scorecard(){
+  const sec=$("#latestSec");
+  if(!LATEST){sec.hidden=true;return;}
+  sec.hidden=false;
+  const L=linfo(), match=$("#matchHour").checked;
+  $("#latestTitle").textContent=`Latest sounding: ${L.label}`;
+  const hl=match?(L.hg<4?HLAB[L.hg]+" ":"off-hour "):"";
+  $("#latestMeta").innerHTML=`Launched ${ago(L.t)}; source ${LATEST.source}. Each parameter is ranked against ${hl}soundings within a week of ${L.day}`+
+    (L.clamped?" (this date is outside May–September, so the nearest two weeks of the season are used)":"")+
+    `, using the current year and flow filters (n=${d3.format(",")(LW.length)}).`+
+    ($("#showAll").checked?"":" Shown: the 12 parameters furthest from normal. Select one to chart it.")+
+    (LIVE?"":" <b style=\"color:var(--ink)\">This is a saved snapshot.</b> Hosted on GitHub with the included workflow, it refreshes every hour.");
+  const rows=P.map(p=>({p,r:rankOf(p.k)})).filter(x=>x.r&&x.r.p!=null);
+  const row=x=>{const pr=Math.round(x.r.p),ext=pr<=10||pr>=90;
+    return `<button type="button" class="srow${x.p.k===S.param?" cur":""}" data-k="${x.p.k}" aria-label="${x.p.l}: ${fmt(x.p.k,x.r.v)}, ${ord(pr)} percentile">
+      <span class="sn" title="${x.p.l}">${x.p.l}</span><span class="sv">${fmt(x.p.k,x.r.v)}</span><span class="sb"><i class="${ext?"ext":""}" style="left:${x.r.p}%"></i></span><span class="sp">${ord(pr)}</span></button>`;};
+  let html="";
+  if($("#showAll").checked){for(const [g,xs] of d3.group(rows,x=>x.p.g))html+=`<h3 class="sg">${g}</h3>`+xs.map(row).join("");}
+  else html=rows.slice().sort((a,b)=>Math.abs(b.r.p-50)-Math.abs(a.r.p-50)).slice(0,12).map(row).join("");
+  $("#scorecard").innerHTML=html||`<p class="empty">Too few soundings near this date with these filters. Widen the year or flow selection, or untick the launch-time match.</p>`;
+}
+$("#scorecard").addEventListener("click",e=>{const b=e.target.closest(".srow");if(!b)return;setParam(b.dataset.k);
+  document.querySelector("header").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});});
+$("#matchHour").addEventListener("change",render);
+$("#showAll").addEventListener("change",render);
+$("#useLatest").addEventListener("click",()=>{
+  const L=linfo(), v=LATEST&&LATEST.values[S.param]; if(v==null)return;
+  $("#cval").value=(+v).toFixed(pm(S.param).dec);
+  const dd=L.clamped?(L.dos===0?{m:0,d:1}:{m:4,d:30}):{m:L.m-5,d:L.d};
+  $("#cmon").value=dd.m;fillDays();$("#cday").value=dd.d;readCheck();render();});
+fetch("latest.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{
+  if(j&&j.valid&&j.values&&(!LATEST||new Date(j.valid)>=new Date(LATEST.valid))){LATEST=j;LIVE=true;render();}
+}).catch(()=>{});
+
 /* ---------------- render ---------------- */
 let raf=0;
 function render(){cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{
   syncs.forEach(f=>f());
   const ix=idx("");
+  LW=LATEST?latestWindow():null; scorecard();
+  $("#useLatest").hidden=!(LATEST&&LATEST.values[S.param]!=null);
   header(ix);season();hist(ix);pctTable(ix);answer();boxPanels();yearChart();scatter(ix);rose(ix);
 });}
+if(/^https?:$/.test(location.protocol)&&!/claude/.test(location.hostname))$("#altLink").hidden=false;
 $("#nsound").textContent=d3.format(",")(N);
 paramName(); render();
 let lastW=0;new ResizeObserver(()=>{const w=document.body.clientWidth;if(w!==lastW){lastW=w;render();}}).observe(document.body);
